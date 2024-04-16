@@ -1,0 +1,1 @@
+In this folder we put in all scripts related to data gathering, data preparation, feature extraction, etc.

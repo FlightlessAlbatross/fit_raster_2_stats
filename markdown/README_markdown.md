@@ -1,0 +1,1 @@
+In this folder we put markdown files. Nice pdfs or htmls for communications purposes. 
