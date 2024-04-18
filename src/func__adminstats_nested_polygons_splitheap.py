@@ -29,6 +29,7 @@ from typing import List
 import heapq
 
 import time
+from datetime import datetime
 
 
 
@@ -113,7 +114,7 @@ class TreeStructure:
 
         # Collect all leaves under the current node
         return collect_leaves(current)
-        
+
     
     def get_all_leaf_nodes(self):
         """Return a list of all leaf nodes (nodes with no children) in the entire tree."""
@@ -462,11 +463,8 @@ class ProcessingConfig:
                     epsg_code = crs.to_epsg()  # This will be None if the EPSG code can't be determined 
                 return (west, north, resolution[0], resolution[1], epsg_code)
 
-                
-    
-    
-                
 
+               
 
 def get_mask_from_polygon(input_path, poly, na_value=255):
     with rasterio.open(input_path) as src:
@@ -512,8 +510,14 @@ def read_raster(input_path, poly):
             # Mask and crop the raster using the current polygon
             out_image, out_transform = mask(src, [geometry], invert=False, crop=True)
 
+            # get the source's na value
+            na_value = src.nodata
             out_image = out_image.astype(float)  # Ensure the data is in float
-            out_image[out_image == 255] = np.nan
+            
+            if na_value is not None:
+                out_image[out_image == na_value] = np.nan
+            else:
+            	raise ValueError(f"Missing NA value information for {input_path}")
 
 
             resolution = src.res  # (pixel width, pixel height)
@@ -546,6 +550,7 @@ def make_region_raster(polys, reference_raster):
     # it might be more convinient to create the rasterized IDs on the fly instead of creating it first and passing it. 
     # this function is not done though. 
         
+    pass
     geometry = polys.geometry.tolist()
     
     with rasterio.open(reference_raster) as src:
@@ -744,15 +749,24 @@ def pipeline(config: ProcessingConfig, region_raster_path, misc_value = 10, outp
         smallest_complete_poly_branch = min(subtree, key=len)
         top_node = smallest_complete_poly_branch.split('/')[-1]
         
-#         print(f"top node of the smallest complete Poly: {smallest_complete_poly_branch}")
         
+        if output_folder:
+            output_path = f'{output_folder}/{top_node}_admin_prediction.tif'
+            
+            if os.path.exists(output_path):
+                print(f"The file {output_path} already exists. Skipping...")
+                continue
+
+        print(f'Aligning everyting below: {top_node}')
+                
+         
         smallest_complete_poly = administrative_polygon.loc[administrative_polygon['tree'] == smallest_complete_poly_branch]
     
         all_polys = administrative_polygon['tree'].isin(subtree)
         
         # TODO!!!! maybe create this on the fly, rather than having one on disc? its one less thing to add
         region_raster = read_raster(region_raster_path, smallest_complete_poly)
-
+        
         
         array_mask = get_mask_from_polygon(probability_layer_paths[0], smallest_complete_poly)
 
@@ -761,6 +775,7 @@ def pipeline(config: ProcessingConfig, region_raster_path, misc_value = 10, outp
         
         int_2_regions = config.make_dict_integer_2_region()
 
+        
         flattened_with_indices = flatten_layers_withregion(probability_layer, probability_layer_codes, region_raster, int_2_regions)
 
 
@@ -773,13 +788,19 @@ def pipeline(config: ProcessingConfig, region_raster_path, misc_value = 10, outp
         pipe = fill_output_array(initial_output, flattened_with_indices, config.tree_counters, 10)
         
         
+        now = datetime.now()
+        # Format the date and time as DD-MM-YY hh:mm
+        formatted_time = now.strftime("%d-%m-%y %H:%M")        
+        print(f'fill_output_array for subtree below {top_node} Done at {formatted_time}')
+
+        
         if output_folder:
-            output_path = f'{output_folder}/{top_node}_admin_prediction.tif'
             write_final_output(config, pipe, output_path, top_node)
         else:
             output_dict[top_node] = pipe
             
-        print(f'fill_output_array for subtree below {top_node} Done')
+
+            
         
     if output_folder is None:
         return output_dict
@@ -788,7 +809,7 @@ def pipeline(config: ProcessingConfig, region_raster_path, misc_value = 10, outp
         return 0
         
 
-def write_final_output(config: ProcessingConfig, data, output_path, top_node):
+def write_final_output(config: ProcessingConfig, data, output_path, top_node, no_data_value = 255):
 
     west, north, res_x, res_y, epsg_code = config.get_poly_GIS_info_for_writing(top_node)
     
@@ -807,7 +828,7 @@ def write_final_output(config: ProcessingConfig, data, output_path, top_node):
         'dtype': 'int16',
         'crs': crs,
         'transform': transform,
-        'nodata': 255 
+        'nodata': no_data_value 
     }
 
 
