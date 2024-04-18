@@ -82,7 +82,7 @@ class TreeStructure:
     def get_paths_from_leaf(self, end_node):
         path = self.get_full_path(end_node)
         all_paths = [path]
-        for p in path.split('/')[:-1]:
+        for p in reversed(path.split('/')[:-1]):
             all_paths.append(self.get_full_path(p))
 
         return all_paths
