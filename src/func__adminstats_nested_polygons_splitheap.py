@@ -781,7 +781,7 @@ def pipeline(config: ProcessingConfig, region_raster_path, misc_value = 10, outp
             
         print(f'fill_output_array for subtree below {top_node} Done')
         
-    if output_folder is none:
+    if output_folder is None:
         return output_dict
     else:
         print(f"All subtree rasterlayers have been writen to {output_folder}. Return 0")
