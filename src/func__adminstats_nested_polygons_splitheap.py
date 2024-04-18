@@ -94,12 +94,26 @@ class TreeStructure:
         return list(current.keys()) if current else []
 
     def get_youngest_children_nodes(self, node_identifier):
+        # Helper function to recursively collect leaves
         def collect_leaves(node):
-            return [key for key, subtree in node.items() if not subtree] if node else []
+            if not node:  # If the node has no children
+                return []
+            leaves = []
+            for key, subtree in node.items():
+                if not subtree:  # This node is a leaf
+                    leaves.append(key)
+                else:
+                    leaves.extend(collect_leaves(subtree))  # Recursively collect leaves
+            return leaves
+
+        # Navigate to the specified node in the tree
         current = self.structure
         for part in self.get_full_path(node_identifier).split('/') if node_identifier else []:
             current = current.get(part, {})
+
+        # Collect all leaves under the current node
         return collect_leaves(current)
+        
     
     def get_all_leaf_nodes(self):
         """Return a list of all leaf nodes (nodes with no children) in the entire tree."""
